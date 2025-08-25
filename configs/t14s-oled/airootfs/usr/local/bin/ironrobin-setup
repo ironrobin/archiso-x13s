@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+echo "Checking for internet connection"
+if ! ping -c 1 archlinuxarm.org; then
+    echo "No internet connection detected. Please connect to the internet and try again."
+    exit 1
+fi
+
+echo "Checking for ironrobin-t14s repository in pacman"
+if grep -q "\[ironrobin-t14s\]" /etc/pacman.conf; then
+    echo "ironrobin-t14s repository already in pacman"
+else
+    echo "Adding ironrobin-t14s repository to pacman"
+    echo -e "\n[ironrobin-t14s]\nServer = https://github.com/ironrobin/t14s-alarm/releases/download/packages\n" >> /etc/pacman.conf
+fi
+
+echo "Checking for ironrobin-t14s gpg keys in pacman"
+if pacman-key --list-keys 6ED02751500A833A; then
+    echo "ironrobin-t14s gpg keys already in pacman"
+else
+    echo "Adding ironrobin-t14s gpg keys to pacman"
+    pacman-key --recv-keys 6ED02751500A833A
+    pacman-key --lsign-key 6ED02751500A833A
+fi
+
+echo "Updating pacman database"
+pacman -Sy

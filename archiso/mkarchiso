@@ -500,6 +500,8 @@ _make_boot_on_fat_aarch64() {
     mcopy -i "${work_dir}/efiboot.img" "${pacstrap_dir}/boot/vmlinux" "::/${install_dir}/boot/${arch}/"
     if [[ "${iso_name}" == "archlinuxarm-volterra" ]]; then
         mcopy -i "${work_dir}/efiboot.img" "${pacstrap_dir}/boot/sc8280xp-microsoft-blackrock.dtb" "::/${install_dir}/boot/${arch}/"
+    elif [[ "${iso_name}" == "archlinuxarm-t14s-oled" ]]; then
+        mcopy -i "${work_dir}/efiboot.img" "${pacstrap_dir}/boot/x1e78100-lenovo-thinkpad-t14s-oled.dtb" "::/${install_dir}/boot/${arch}/"
     else
         mcopy -i "${work_dir}/efiboot.img" "${pacstrap_dir}/boot/sc8280xp-lenovo-thinkpad-x13s.dtb" "::/${install_dir}/boot/${arch}/"
     fi
@@ -605,6 +607,15 @@ _make_bootmode_uefi-aarch64.systemd-boot.esp() {
             "${pacstrap_dir}/boot/vmlinux" \
             "${pacstrap_dir}/boot/initramfs-"*".img" \
             "${pacstrap_dir}/boot/sc8280xp-microsoft-blackrock.dtb" \
+            "${_available_ucodes[@]}" \
+            2>/dev/null | awk 'END { print $1 }')"
+    elif [[ "${iso_name}" == "archlinuxarm-t14s-oled" ]]; then
+        efiboot_imgsize="$(du -bc \
+            "${pacstrap_dir}/usr/lib/systemd/boot/efi/systemd-bootaa64.efi" \
+            "${profile}/efiboot/" \
+            "${pacstrap_dir}/boot/vmlinux" \
+            "${pacstrap_dir}/boot/initramfs-"*".img" \
+            "${pacstrap_dir}/boot/x1e78100-lenovo-thinkpad-t14s-oled.dtb" \
             "${_available_ucodes[@]}" \
             2>/dev/null | awk 'END { print $1 }')"
     else
