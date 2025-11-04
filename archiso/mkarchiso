@@ -507,8 +507,11 @@ _make_boot_on_fat() {
     _msg_info "Preparing kernel and initramfs for the FAT file system..."
     mmd -i "${efibootimg}" \
         "::/${install_dir}" "::/${install_dir}/boot" "::/${install_dir}/boot/${arch}"
-    mcopy -i "${efibootimg}" "${pacstrap_dir}/boot/vmlinuz-"* \
-        "${pacstrap_dir}/boot/initramfs-"*".img" "::/${install_dir}/boot/${arch}/"
+    mcopy -i "${efibootimg}" \
+        "${pacstrap_dir}/boot/vmlinux"* \
+        "${pacstrap_dir}/boot/initramfs-"*".img" \
+        "${pacstrap_dir}/boot/sc8280xp-lenovo-thinkpad-x13s.dtb" \
+        "::/${install_dir}/boot/${arch}/"
     if (( need_external_ucodes )); then
         for ucode_image in "${ucodes[@]}"; do
             if [[ -e "${pacstrap_dir}/boot/${ucode_image}" ]]; then
@@ -850,8 +853,9 @@ _make_bootmode_uefi.systemd-boot() {
     efiboot_files+=("${pacstrap_dir}/usr/lib/systemd/boot/efi/systemd-boot${uefi_arch[$arch],,}.efi"
                     "${pacstrap_dir}/usr/share/edk2-shell/${uefi_arch[$arch],,}/Shell_Full.efi"
                     "${work_dir}/loader/"
-                    "${pacstrap_dir}/boot/vmlinuz-"*
+                    "${pacstrap_dir}/boot/vmlinux"*
                     "${pacstrap_dir}/boot/initramfs-"*".img"
+                    "${pacstrap_dir}/boot/sc8280xp-lenovo-thinkpad-x13s.dtb"
                     "${_available_ucodes[@]}")
 
     # Files specific to x86_64: IA32 UEFI binaries for mixed mode booting, memtest86+
