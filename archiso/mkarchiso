@@ -30,6 +30,7 @@ iso_application=""
 iso_version=""
 install_dir=""
 arch=""
+dtb=""
 pacman_conf=""
 packages=""
 bootstrap_packages=""
@@ -133,6 +134,7 @@ _show_config() {
     printf -v build_date '%(%FT%R%z)T' "${SOURCE_DATE_EPOCH}"
     _msg_info "${app_name} configuration settings"
     _msg_info "             Architecture:   ${arch}"
+    _msg_info "             Device Tree:    ${dtb}"
     _msg_info "        Working directory:   ${work_dir}"
     _msg_info "   Installation directory:   ${install_dir}"
     _msg_info "               Build date:   ${build_date}"
@@ -510,7 +512,7 @@ _make_boot_on_fat() {
     mcopy -i "${efibootimg}" \
         "${pacstrap_dir}/boot/vmlinux"* \
         "${pacstrap_dir}/boot/initramfs-"*".img" \
-        "${pacstrap_dir}/boot/sc8280xp-lenovo-thinkpad-x13s.dtb" \
+        "${pacstrap_dir}/boot/${dtb}" \
         "::/${install_dir}/boot/${arch}/"
     if (( need_external_ucodes )); then
         for ucode_image in "${ucodes[@]}"; do
@@ -838,6 +840,7 @@ _make_bootmode_uefi.systemd-boot() {
         sed "s|%ARCHISO_LABEL%|${iso_label}|g;
              s|%ARCHISO_UUID%|${iso_uuid}|g;
              s|%INSTALL_DIR%|${install_dir}|g;
+             s|%DTB%|${dtb}|g;
              s|%ARCH%|${arch}|g" \
             "${_conf}" >"${work_dir}/loader/entries/${_conf##*/}"
     done
@@ -855,7 +858,7 @@ _make_bootmode_uefi.systemd-boot() {
                     "${work_dir}/loader/"
                     "${pacstrap_dir}/boot/vmlinux"*
                     "${pacstrap_dir}/boot/initramfs-"*".img"
-                    "${pacstrap_dir}/boot/sc8280xp-lenovo-thinkpad-x13s.dtb"
+                    "${pacstrap_dir}/boot/${dtb}"
                     "${_available_ucodes[@]}")
 
     # Files specific to x86_64: IA32 UEFI binaries for mixed mode booting, memtest86+

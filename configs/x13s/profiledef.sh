@@ -10,6 +10,7 @@ install_dir="arch"
 buildmodes=('iso')
 bootmodes=('uefi.systemd-boot')
 arch='aarch64'
+dtb='sc8280xp-lenovo-thinkpad-x13s.dtb'
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
 airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M')
