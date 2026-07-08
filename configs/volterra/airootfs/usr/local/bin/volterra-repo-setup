@@ -47,7 +47,7 @@ else
     cat >> /etc/pacman.conf <<'EOF'
 
 [ironrobin-volterra]
-Server = https://github.com/ironrobin/x13s-alarm/releases/download/packages
+Server = https://github.com/ironrobin/volterra-alarm/releases/download/packages
 EOF
 fi
 
