@@ -51,6 +51,7 @@ libusb-compat
 linux-atm
 linux-firmware
 linux-firmware-qcom
+linux-firmware-atheros
 livecd-sounds
 lsscsi
 lvm2
@@ -117,4 +118,5 @@ xl2tpd
 zsh
 
 # Custom Packages go here
-linux-x13s
+linux
+linux-dtbs
