@@ -2,7 +2,7 @@
 alsa-utils
 amd-ucode
 arch-install-scripts
-archinstall
+archinstall-x13s
 base
 bind-tools
 brltty
@@ -51,7 +51,6 @@ libusb-compat
 linux-atm
 linux-firmware
 linux-firmware-qcom
-linux-firmware-atheros
 livecd-sounds
 lsscsi
 lvm2
