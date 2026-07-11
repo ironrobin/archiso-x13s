@@ -118,4 +118,4 @@ zsh
 
 # Custom Packages go here
 volterra-firmware
-archinstall
+archinstall-aarch64
