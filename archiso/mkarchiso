@@ -302,9 +302,8 @@ _make_pacman_conf() {
     # HookDir is *always* set to the airootfs' override directory
     # see `man 8 pacman` for further info
     pacman-conf --config "${pacman_conf}" \
-        | sed "/^[[:space:]]*CacheDir/d;/^[[:space:]]*DBPath/d;/^[[:space:]]*HookDir/d;/^[[:space:]]*LogFile/d;/^[[:space:]]*RootDir/d;/^[[:space:]]*GPGDir/d;/\[options\]/a CacheDir = ${_cache_dirs}
-        /\[options\]/a HookDir = ${pacstrap_dir}/etc/pacman.d/hooks/
-        /\[options\]/a GPGDir = ${work_dir}/pacman-gnupg/" >"${work_dir}/${buildmode}.pacman.conf"
+        | sed "/CacheDir/d;/DBPath/d;/HookDir/d;/LogFile/d;/RootDir/d;/\[options\]/a CacheDir = ${_cache_dirs}
+        /\[options\]/a HookDir = ${pacstrap_dir}/etc/pacman.d/hooks/" >"${work_dir}/${buildmode}.pacman.conf"
 }
 
 # Prepare working directory and copy custom root file system files.
@@ -338,39 +337,6 @@ _make_custom_airootfs() {
         done
         _msg_info "Done!"
     fi
-}
-
-# Prepare a custom keyring for the work directory
-_prepare_custom_keyring() {
-    local build_gpgdir="${work_dir}/pacman-gnupg"
-    local keydir="${profile}/airootfs/usr/local/share/pacman/custom-keys"
-    local keys=(
-        "ironrobin.gpg:1B623AEF2DC40C944C3A51E66ED02751500A833A"
-        "drzee.gpg:9B2C213B21883BB65CE2FB900CF25682E6BA0751"
-    )
-    local key file id
-
-    _msg_info "Preparing custom pacman keyring..."
-
-    [[ -d "${keydir}" ]] || _msg_error "Missing custom key directory: ${keydir}"
-
-    rm -rf -- "${build_gpgdir}"
-    install -d -m 700 "${build_gpgdir}"
-
-    pacman-key --gpgdir "${build_gpgdir}" --init
-    pacman-key --gpgdir "${build_gpgdir}" --populate
-
-    for key in "${keys[@]}"; do
-        file="${key%%:*}"
-        id="${key##*:}"
-
-        [[ -f "${keydir}/${file}" ]] || _msg_error "Missing key file: ${keydir}/${file}"
-
-        pacman-key --gpgdir "${build_gpgdir}" --add "${keydir}/${file}"
-        pacman-key --gpgdir "${build_gpgdir}" --lsign-key "${id}"
-    done
-
-    _msg_info "Done preparing custom pacman keyring."
 }
 
 # Install desired packages to the root file system
@@ -452,6 +418,37 @@ _make_customize_airootfs() {
     fi
 }
 
+# Build an EFI executable containing the kernel and the platform device tree.
+generate_stubble_efi() {
+    local dtb_path hwids_path kernel_path
+    local kernel_paths=()
+
+    [[ -e "${pacstrap_dir}/usr/lib/stubble/stubble.efi" ]] || return 0
+
+    _msg_info "Generating a stubble EFI executable..."
+
+    command -v ukify &>/dev/null || _msg_error "ukify is required to generate the stubble EFI executable." 1
+    mapfile -t kernel_paths < <(compgen -G "${pacstrap_dir}/boot/vmlinuz-*" || true)
+    if (( ${#kernel_paths[@]} != 1 )); then
+        _msg_error "Expected exactly one kernel in '${pacstrap_dir}/boot', found ${#kernel_paths[@]}." 1
+    fi
+    kernel_path="${kernel_paths[0]}"
+    dtb_path="$(find "${pacstrap_dir}/usr/lib/modules" \
+        -path "*/dtb/qcom/${dtb}" -print -quit)"
+    [[ -n "${dtb_path}" ]] || _msg_error "Device tree '${dtb}' was not found in the staged root." 1
+    hwids_path="${pacstrap_dir}/usr/lib/systemd/boot/hwids/${uefi_arch[$arch],,}"
+    [[ -d "${hwids_path}" ]] || _msg_error "Hardware IDs directory '${hwids_path}' was not found." 1
+
+    ukify build \
+        --stub="${pacstrap_dir}/usr/lib/stubble/stubble.efi" \
+        --linux="${kernel_path}" \
+        --hwids="${hwids_path}" \
+        --devicetree-auto="${dtb_path}" \
+        --output="${pacstrap_dir}/boot/vmlinuz.efi"
+
+    _msg_info "Done! Stubble EFI executable generated successfully."
+}
+
 # Set up boot loaders
 _make_bootmodes() {
     local bootmode
@@ -471,6 +468,9 @@ _make_boot_on_iso9660() {
     install -d -m 0755 -- "${isofs_dir}/${install_dir}/boot/${arch}"
     install -m 0644 -- "${pacstrap_dir}/boot/initramfs-"*".img" "${isofs_dir}/${install_dir}/boot/${arch}/"
     install -m 0644 -- "${pacstrap_dir}/boot/vmlinuz-"* "${isofs_dir}/${install_dir}/boot/${arch}/"
+    if [[ -e "${pacstrap_dir}/boot/vmlinuz.efi" ]]; then
+        install -m 0644 -- "${pacstrap_dir}/boot/vmlinuz.efi" "${isofs_dir}/${install_dir}/boot/${arch}/"
+    fi
 
     if (( need_external_ucodes )); then
         for ucode_image in "${ucodes[@]}"; do
@@ -543,13 +543,13 @@ _make_boot_on_fat() {
     _msg_info "Preparing kernel and initramfs for the FAT file system..."
     mmd -i "${efibootimg}" \
         "::/${install_dir}" "::/${install_dir}/boot" "::/${install_dir}/boot/${arch}"
-    dtb_path="$(find "${pacstrap_dir}/usr/lib/modules" \
-        -path "*/dtb/qcom/${dtb}" -print -quit)"
-    mcopy -i "${efibootimg}" \
-        "${pacstrap_dir}/boot/vmlinuz-linux"* \
-        "${pacstrap_dir}/boot/initramfs-"*".img" \
-        "${dtb_path}" \
-        "::/${install_dir}/boot/${arch}/"
+    mcopy -i "${efibootimg}" "${pacstrap_dir}/boot/vmlinuz-"* \
+        "${pacstrap_dir}/boot/initramfs-"*".img" "::/${install_dir}/boot/${arch}/"
+    if [[ -e "${pacstrap_dir}/boot/vmlinuz.efi" ]]; then
+        mcopy -i "${efibootimg}" \
+            "${pacstrap_dir}/boot/vmlinuz.efi" \
+            "::/${install_dir}/boot/${arch}/"
+    fi
     if (( need_external_ucodes )); then
         for ucode_image in "${ucodes[@]}"; do
             if [[ -e "${pacstrap_dir}/boot/${ucode_image}" ]]; then
@@ -834,7 +834,7 @@ _make_common_bootmode_uefi.systemd-boot_copy_files() {
     # shell*.efi is picked up automatically when on /
     if [[ -e "${pacstrap_dir}/usr/share/edk2-shell/${target_arch,,}/Shell_Full.efi" ]]; then
         mcopy -i "${efibootimg}" \
-            "${pacstrap_dir}/usr/share/edk2-shell/x64/Shell_Full.efi" "::/shell${target_arch,,}.efi"
+            "${pacstrap_dir}/usr/share/edk2-shell/${target_arch,,}/Shell_Full.efi" "::/shell${target_arch,,}.efi"
         install -m 0644 -- "${pacstrap_dir}/usr/share/edk2-shell/${target_arch,,}/Shell_Full.efi" \
             "${isofs_dir}/shell${target_arch,,}.efi"
     fi
@@ -876,7 +876,6 @@ _make_bootmode_uefi.systemd-boot() {
         sed "s|%ARCHISO_LABEL%|${iso_label}|g;
              s|%ARCHISO_UUID%|${iso_uuid}|g;
              s|%INSTALL_DIR%|${install_dir}|g;
-             s|%DTB%|${dtb}|g;
              s|%ARCH%|${arch}|g" \
             "${_conf}" >"${work_dir}/loader/entries/${_conf##*/}"
     done
@@ -888,16 +887,16 @@ _make_bootmode_uefi.systemd-boot() {
             fi
         done
     fi
-    dtb_path="$(find "${pacstrap_dir}/usr/lib/modules" \
-        -path "*/dtb/qcom/${dtb}" -print -quit)"
     # Calculate the required FAT image size in bytes
     efiboot_files+=("${pacstrap_dir}/usr/lib/systemd/boot/efi/systemd-boot${uefi_arch[$arch],,}.efi"
                     "${pacstrap_dir}/usr/share/edk2-shell/${uefi_arch[$arch],,}/Shell_Full.efi"
                     "${work_dir}/loader/"
-                    "${pacstrap_dir}/boot/vmlinuz-linux"*
+                    "${pacstrap_dir}/boot/vmlinuz-"*
                     "${pacstrap_dir}/boot/initramfs-"*".img"
-                    "${dtb_path}"
                     "${_available_ucodes[@]}")
+    if [[ -e "${pacstrap_dir}/boot/vmlinuz.efi" ]]; then
+        efiboot_files+=("${pacstrap_dir}/boot/vmlinuz.efi")
+    fi
 
     # Files specific to x86_64: IA32 UEFI binaries for mixed mode booting, memtest86+
     if [[ "$arch" == 'x86_64' ]]; then
@@ -1751,20 +1750,12 @@ _make_version() {
 _make_pkglist() {
     _msg_info "Creating a list of installed packages on live-enviroment..."
     case "${buildmode}" in
-        bootstrap)
-            pacman -Q \
-                --config "${work_dir}/${buildmode}.pacman.conf" \
-                --dbpath "${pacstrap_dir}/var/lib/pacman" \
-                --gpgdir "${work_dir}/pacman-gnupg" \
-                >"${bootstrap_parent}/pkglist.${arch}.txt"
+        "bootstrap")
+            pacman -Q --sysroot "${pacstrap_dir}" >"${bootstrap_parent}/pkglist.${arch}.txt"
             ;;
-        iso|netboot)
+        "iso"|"netboot")
             install -d -m 0755 -- "${isofs_dir}/${install_dir}"
-            pacman -Q \
-                --config "${work_dir}/${buildmode}.pacman.conf" \
-                --dbpath "${pacstrap_dir}/var/lib/pacman" \
-                --gpgdir "${work_dir}/pacman-gnupg" \
-                >"${isofs_dir}/${install_dir}/pkglist.${arch}.txt"
+            pacman -Q --sysroot "${pacstrap_dir}" >"${isofs_dir}/${install_dir}/pkglist.${arch}.txt"
             ;;
     esac
     _msg_info "Done!"
@@ -1799,10 +1790,10 @@ _build_iso_base() {
     _run_once _make_pacman_conf
     [[ -z "${gpg_key}" ]] || _run_once _export_gpg_publickey
     _run_once _make_custom_airootfs
-    _run_once _prepare_custom_keyring
     _run_once _make_packages
     _run_once _make_version
     _run_once _make_customize_airootfs
+    _run_once generate_stubble_efi
     _run_once _make_pkglist
     if [[ "$arch" == @('x86_64'|'i686') ]]; then
         _run_once _check_if_initramfs_has_ucode
