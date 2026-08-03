@@ -1,5 +1,14 @@
 # archiso for Lenovo ThinkPad X13s
 
+# This project has moved
+
+**The canonical repository is now on Codeberg:**
+
+https://codeberg.org/ironrobin/archiso-x13s
+
+This GitHub repository is no longer accepting issues or pull requests. Please
+open new issues and submit contributions on Codeberg.
+
 This repository contains a customized archiso preset for building images for the ThinkPad X13s ARM laptop. Pre-built images are available in [Releases](https://github.com/ironrobin/archiso-x13s/releases).
 
 X13s specific packages can be found [here](https://github.com/ironrobin/x13s-alarm/releases/tag/packages).
